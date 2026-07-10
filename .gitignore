@@ -24,7 +24,6 @@ Thumbs.db
 .idea/
 
 # Data 
-data/
 data/raw/*
 !data/raw/.gitkeep
 
