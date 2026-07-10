@@ -1,11 +1,13 @@
 """
 test_data_loader.py
 
-Unit tests for src/data_loader.py, run against the real
-data/raw/BrentOilPrices.csv as well as small synthetic edge cases.
-"""
+Unit tests for src/data_loader.py.
 
-from pathlib import Path
+Sample data is embedded directly in this file (SAMPLE_CSV below) and
+written to a pytest tmp_path at test time. This avoids depending on the
+real data/raw/BrentOilPrices.csv, which is intentionally gitignored and
+not available in CI, and avoids needing a separate committed fixture file.
+"""
 
 import numpy as np
 import pandas as pd
@@ -13,14 +15,33 @@ import pytest
 
 from src.data_loader import load_brent_prices, volatility_by_period
 
-RAW_DATA_PATH = (
-    Path(__file__).resolve().parents[1] / "data" / "raw" / "BrentOilPrices.csv"
-)
+# 15 rows covering both date formats found in the real dataset:
+# 'DD-Mon-YY' (used through Apr 2020) and 'Mon DD, YYYY' (used after,
+# quoted here because the date itself contains a comma).
+SAMPLE_CSV = """Date,Price
+20-May-87,18.63
+21-May-87,18.45
+22-May-87,18.55
+25-May-87,18.60
+26-May-87,18.63
+15-Jun-09,68.20
+16-Jun-09,70.10
+17-Jun-09,69.55
+01-Mar-20,45.30
+02-Mar-20,44.10
+"Apr 22, 2020",13.77
+"Apr 23, 2020",15.06
+"Apr 24, 2020",15.87
+"Jan 03, 2022",79.80
+"Jan 04, 2022",81.20
+"""
 
 
-@pytest.fixture(scope="module")
-def brent_df():
-    return load_brent_prices(RAW_DATA_PATH, verbose=False)
+@pytest.fixture
+def brent_df(tmp_path):
+    csv_path = tmp_path / "sample_brent_prices.csv"
+    csv_path.write_text(SAMPLE_CSV)
+    return load_brent_prices(csv_path, verbose=False)
 
 
 def test_loads_expected_columns(brent_df):
@@ -36,9 +57,10 @@ def test_dates_are_sorted(brent_df):
     assert brent_df["Date"].is_monotonic_increasing
 
 
-def test_date_range_matches_known_bounds(brent_df):
+def test_both_date_formats_parsed(brent_df):
     assert brent_df["Date"].min() == pd.Timestamp("1987-05-20")
-    assert brent_df["Date"].max() >= pd.Timestamp("2022-09-30")
+    assert brent_df["Date"].max() == pd.Timestamp("2022-01-04")
+    assert len(brent_df) == 15
 
 
 def test_log_return_first_row_is_nan(brent_df):
@@ -77,11 +99,3 @@ def test_volatility_by_period_shape(brent_df):
     assert list(result.columns) == ["period", "n_obs", "log_return_std"]
     assert len(result) == 5
     assert result["n_obs"].sum() <= len(brent_df)
-
-
-def test_volatility_2020_2022_higher_than_2009_2014(brent_df):
-    # Known finding from Task 1 EDA: volatility roughly doubled post-2020
-    result = volatility_by_period(brent_df).set_index("period")
-    calm_period_std = result.loc["2009-2014", "log_return_std"]
-    volatile_period_std = result.loc["2020-2022", "log_return_std"]
-    assert volatile_period_std > calm_period_std
