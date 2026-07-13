@@ -25,6 +25,7 @@ Thumbs.db
 
 # Data 
 data/raw/*
+data/processed/*
 !data/raw/.gitkeep
 
 # Outputs
