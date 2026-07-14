@@ -101,7 +101,7 @@ Backend endpoints: `/api/prices` (with `?start=&end=` filtering),
 
 | Price Trend | Events (drill-down) | Metrics |
 |---|---|---|
-| ![Price Trend page](docs/screenshots/price-trend.png) | ![Events page with drill-down panel open](docs/screenshots/events.png) | ![Metrics page](docs/screenshots/metrics.png) |
+| ![Price Trend page](screenshots/price-trend.png) | ![Events page with drill-down panel open](screenshots/events.png) | ![Metrics page](screenshots/metrics.png) |
 
 ## Folder Structure
 
