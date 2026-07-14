@@ -48,12 +48,12 @@ Bayesian single change-point model (PyMC), documented in
   impact and satisfy the "associate changes with causes" requirement the
   global model alone couldn't:
 
-  | Event | Detected date | Offset | Price shift | 
+  | Event | Detected date | Offset | Price shift | Reliable? |
   |---|---|---|---|---|
-  | Iraqi Invasion of Kuwait (1990-08-02) | 1990-08-01 | -1 day | $18.14 → $23.23 (+28.1%) |
-  | Lehman Brothers Collapse (2008-09-15) | 2008-10-09 | +24 days | $93.29 → $62.06 (-33.5%) | 
-  | OPEC Declines to Cut Production (2014-11-27) | 2014-11-26 | -1 day | $105.09 → $49.17 (-53.2%) | 
-  | Saudi-Russia Price War (2020-03-08) | 2020-01-29 | -39 days | $65.74 → $51.52 (-21.6%) | 
+  | Iraqi Invasion of Kuwait (1990-08-02) | 1990-08-01 | -1 day | $18.14 → $23.23 (+28.1%) | ✅ |
+  | Lehman Brothers Collapse (2008-09-15) | 2008-10-09 | +24 days | $93.29 → $62.06 (-33.5%) | ✅ |
+  | OPEC Declines to Cut Production (2014-11-27) | 2014-11-26 | -1 day | $105.09 → $49.17 (-53.2%) | ✅ (after resampling) |
+  | Saudi-Russia Price War (2020-03-08) | 2020-01-29 | -39 days | $65.74 → $51.52 (-21.6%) | ✅ (after resampling) |
 
 - **Reliability checks**: every event checked against r_hat/ESS
   thresholds (`diagnose_reliability`); 2 of 4 initially failed and were
@@ -101,7 +101,7 @@ Backend endpoints: `/api/prices` (with `?start=&end=` filtering),
 
 | Price Trend | Events (drill-down) | Metrics |
 |---|---|---|
-| ![Price Trend page](screenshots/price-trend.png) | ![Events page with drill-down panel open](screenshots/events.png) | ![Metrics page](screenshots/metrics.png) |
+| ![Price Trend page](docs/screenshots/price-trend.png) | ![Events page with drill-down panel open](docs/screenshots/events.png) | ![Metrics page](docs/screenshots/metrics.png) |
 
 ## Folder Structure
 
