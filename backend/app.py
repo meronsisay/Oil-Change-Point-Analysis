@@ -1,7 +1,7 @@
 """
 app.py
 
-Flask backend for the Brent oil price change point dashboard.
+Flask backend for the Brent oil price change point dashboard (Task 3).
 
 Deliberately has NO PyMC/ArviZ dependency - all modeling happens in
 notebooks/change_point_model.ipynb, which calls export_results_for_dashboard()
@@ -94,10 +94,21 @@ def get_events():
     return jsonify(data)
 
 
+@app.route("/api/volatility")
+def get_volatility():
+    """Log-return volatility (std dev) by time period - the 'performance
+    metrics' / 'key indicators' data Task 3 asks the dashboard to display.
+    """
+    data = _load_json("volatility.json")
+    if data is None:
+        return jsonify({"error": "volatility.json not found"}), 404
+    return jsonify(data)
+
+
 @app.route("/api/health")
 def health():
     """Quick check that the export files exist and this API is usable."""
-    files = ["prices.csv", "global_changepoint.json", "event_changepoints.json", "events.json"]
+    files = ["prices.csv", "global_changepoint.json", "event_changepoints.json", "events.json", "volatility.json"]
     status = {f: (DATA_DIR / f).exists() for f in files}
     return jsonify({"data_dir": str(DATA_DIR), "files": status})
 

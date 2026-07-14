@@ -492,23 +492,15 @@ def resample_unreliable(
     list of dicts, one per resampled event: {event_name, reliable, note}
     """
     event_date_lookup = {name: date for date, name in target_events}
-    unreliable_events = diagnostics_df.loc[
-        ~diagnostics_df["Reliable"], "Event"
-    ].tolist()
+    unreliable_events = diagnostics_df.loc[~diagnostics_df["Reliable"], "Event"].tolist()
 
     report = []
     for event_name in unreliable_events:
         event_date = event_date_lookup[event_name]
         out = run_windowed_changepoint(
-            df,
-            event_date,
-            events_df,
-            years_before=1.5,
-            years_after=1.5,
-            draws=draws,
-            tune=tune,
-            chains=chains,
-            random_seed=random_seed,
+            df, event_date, events_df,
+            years_before=1.5, years_after=1.5,
+            draws=draws, tune=tune, chains=chains, random_seed=random_seed,
         )
         windowed_results[event_name] = out
         reliable, note = diagnose_reliability(out["results"]["summary_table"])
@@ -560,11 +552,8 @@ def check_window_stability(
     detected_dates = []
     for years in window_sizes:
         out = run_windowed_changepoint(
-            df,
-            event_date,
-            events_df,
-            years_before=years,
-            years_after=years,
+            df, event_date, events_df,
+            years_before=years, years_after=years,
             **sample_kwargs,
         )
         detected_dates.append(out["results"]["tau_mode_date"])
@@ -579,9 +568,7 @@ def check_window_stability(
     }
 
 
-def build_event_summary_table(
-    windowed_results: dict, target_events: list
-) -> pd.DataFrame:
+def build_event_summary_table(windowed_results: dict, target_events: list) -> pd.DataFrame:
     """Build a comparison table across all windowed event results.
 
     Parameters
@@ -606,18 +593,16 @@ def build_event_summary_table(
         actual_date = pd.Timestamp(event_date_lookup[event_name])
         detected_date = r["tau_mode_date"]
         offset_days = (detected_date - actual_date).days
-        rows.append(
-            {
-                "Event": event_name,
-                "Actual Date": actual_date.date(),
-                "Detected Date": detected_date.date(),
-                "Offset (days)": offset_days,
-                "Price Before ($)": round(r["mu1_mean"], 2),
-                "Price After ($)": round(r["mu2_mean"], 2),
-                "% Change": round(r["pct_change_mean"] * 100, 1),
-                "Max r_hat": round(r["rhat_max"], 4),
-            }
-        )
+        rows.append({
+            "Event": event_name,
+            "Actual Date": actual_date.date(),
+            "Detected Date": detected_date.date(),
+            "Offset (days)": offset_days,
+            "Price Before ($)": round(r["mu1_mean"], 2),
+            "Price After ($)": round(r["mu2_mean"], 2),
+            "% Change": round(r["pct_change_mean"] * 100, 1),
+            "Max r_hat": round(r["rhat_max"], 4),
+        })
 
     return (
         pd.DataFrame(rows)
@@ -670,6 +655,7 @@ def export_results_for_dashboard(
         {output_dir}/global_changepoint.json   - global model result
         {output_dir}/event_changepoints.json   - per-event windowed results
         {output_dir}/events.json               - the events dataset
+        {output_dir}/volatility.json           - log-return std dev by period
 
     Parameters
     ----------
@@ -717,31 +703,42 @@ def export_results_for_dashboard(
     for _, row in summary_df.iterrows():
         event_name = row["Event"]
         matched = windowed_results[event_name]["matched_event"]
-        event_export.append(
-            {
-                "event_name": event_name,
-                "actual_date": str(row["Actual Date"]),
-                "detected_date": str(row["Detected Date"]),
-                "offset_days": int(row["Offset (days)"]),
-                "price_before": row["Price Before ($)"],
-                "price_after": row["Price After ($)"],
-                "pct_change": row["% Change"],
-                "rhat_max": row["Max r_hat"],
-                "matched_event": matched["event_name"] if matched else None,
-            }
-        )
+        event_export.append({
+            "event_name": event_name,
+            "actual_date": str(row["Actual Date"]),
+            "detected_date": str(row["Detected Date"]),
+            "offset_days": int(row["Offset (days)"]),
+            "price_before": row["Price Before ($)"],
+            "price_after": row["Price After ($)"],
+            "pct_change": row["% Change"],
+            "rhat_max": row["Max r_hat"],
+            "matched_event": matched["event_name"] if matched else None,
+        })
     with open(out / "event_changepoints.json", "w") as f:
         json.dump(event_export, f, indent=2)
 
     # 4. Events dataset, as JSON (frontend likely wants this format, not CSV)
     events_export = events_df.copy()
-    events_export["date"] = pd.to_datetime(events_export["date"]).dt.strftime(
-        "%Y-%m-%d"
-    )
+    events_export["date"] = pd.to_datetime(events_export["date"]).dt.strftime("%Y-%m-%d")
     events_export.to_json(out / "events.json", orient="records", indent=2)
+
+    # 5. Volatility-by-period, and the reliability status of each windowed
+    #    event - this is the "performance metrics" data the dashboard
+    #    needs for its "key indicators: volatility, average price changes"
+    #    feature, which wasn't exposed by any of the files above.
+    from .data_loader import volatility_by_period
+    vol_table = volatility_by_period(df)
+    vol_export = vol_table.to_dict(orient="records")
+    for record in vol_export:
+        for key, value in record.items():
+            if isinstance(value, float) and pd.isna(value):
+                record[key] = None
+    with open(out / "volatility.json", "w") as f:
+        json.dump(vol_export, f, indent=2)
 
     print(f"Exported dashboard data to {out.resolve()}")
     print(f"  prices.csv:              {len(df)} rows")
     print(f"  global_changepoint.json: 1 result")
     print(f"  event_changepoints.json: {len(event_export)} events")
     print(f"  events.json:             {len(events_export)} events")
+    print(f"  volatility.json:         {len(vol_export)} periods")
