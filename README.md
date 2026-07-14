@@ -48,12 +48,12 @@ Bayesian single change-point model (PyMC), documented in
   impact and satisfy the "associate changes with causes" requirement the
   global model alone couldn't:
 
-  | Event | Detected date | Offset | Price shift | Reliable? |
+  | Event | Detected date | Offset | Price shift | 
   |---|---|---|---|---|
-  | Iraqi Invasion of Kuwait (1990-08-02) | 1990-08-01 | -1 day | $18.14 → $23.23 (+28.1%) | ✅ |
-  | Lehman Brothers Collapse (2008-09-15) | 2008-10-09 | +24 days | $93.29 → $62.06 (-33.5%) | ✅ |
-  | OPEC Declines to Cut Production (2014-11-27) | 2014-11-26 | -1 day | $105.09 → $49.17 (-53.2%) | ✅ (after resampling) |
-  | Saudi-Russia Price War (2020-03-08) | 2020-01-29 | -39 days | $65.74 → $51.52 (-21.6%) | ✅ (after resampling) |
+  | Iraqi Invasion of Kuwait (1990-08-02) | 1990-08-01 | -1 day | $18.14 → $23.23 (+28.1%) |
+  | Lehman Brothers Collapse (2008-09-15) | 2008-10-09 | +24 days | $93.29 → $62.06 (-33.5%) | 
+  | OPEC Declines to Cut Production (2014-11-27) | 2014-11-26 | -1 day | $105.09 → $49.17 (-53.2%) | 
+  | Saudi-Russia Price War (2020-03-08) | 2020-01-29 | -39 days | $65.74 → $51.52 (-21.6%) | 
 
 - **Reliability checks**: every event checked against r_hat/ESS
   thresholds (`diagnose_reliability`); 2 of 4 initially failed and were
@@ -72,11 +72,36 @@ Bayesian single change-point model (PyMC), documented in
 | `global_changepoint.json` | The global model's result: detected date, HDI, regime means |
 | `event_changepoints.json` | The 4-event summary table (dates, offsets, price shift, r_hat) |
 | `events.json` | All 16 researched events, for the "all events" dashboard view |
+| `volatility.json` | Log-return volatility by period (the dashboard's "key indicator") |
 
 `data/processed/` is gitignored, same as `data/raw/` — it's regenerable
 output, not something to hand-maintain. Re-run the notebook's export cell
 any time the model changes; the backend picks up new files on the next
 request with no restart needed.
+
+### Interactive Dashboard
+Flask API (`backend/app.py`) + React frontend (`frontend/`), split into
+three pages rather than one long scrolling view:
+
+- **Price Trend** (`/`) — the price chart with event markers overlaid
+  (color-coded by expected direction), a date range filter, and a
+  Recharts `Brush` for zooming into a sub-range client-side.
+- **Events** (`/events`) — full researched-event list with a category
+  filter, drilling down into a detail panel showing each event's
+  description and, for the 4 modeled events, its quantified price shift.
+- **Metrics** (`/metrics`) — volatility-by-period chart and the full
+  convergence/reliability table across all modeled events.
+
+Backend endpoints: `/api/prices` (with `?start=&end=` filtering),
+`/api/changepoints/global`, `/api/changepoints/events`, `/api/events`,
+`/api/volatility`, `/api/health`. Full request/response documentation in
+`backend/README.md`.
+
+**Screenshots:**
+
+| Price Trend | Events (drill-down) | Metrics |
+|---|---|---|
+| ![Price Trend page](screenshots/price-trend.png) | ![Events page with drill-down panel open](screenshots/events.png) | ![Metrics page](screenshots/metrics.png) |
 
 ## Folder Structure
 
@@ -84,7 +109,17 @@ request with no restart needed.
 ├── .github/workflows/       # CI (unit tests on push/PR)
 ├── .vscode/                  # Editor settings
 ├── backend/
-│   └── app.py                 # Flask API serving data/processed/ (no PyMC dependency)
+│   ├── app.py                 # Flask API serving data/processed/ (no PyMC dependency)
+│   └── README.md              # Endpoint documentation
+├── frontend/
+│   ├── src/
+│   │   ├── pages/               # OverviewPage, EventsPage, MetricsPage (routed)
+│   │   ├── components/          # layout/, filters/, chart/, events/, metrics/
+│   │   ├── context/             # Shared data + filter state across pages
+│   │   └── api.js               # Backend fetch calls
+│   └── README.md               # Frontend setup + feature checklist
+├── docs/
+│   └── screenshots/          # Dashboard screenshots for this README
 ├── data/
 │   ├── raw/                    # Original source data (gitignored)
 │   ├── processed/               # Exported dashboard data (gitignored, regenerable)
@@ -106,7 +141,9 @@ request with no restart needed.
 
 ## Environment Setup
 
-Requires **Python 3.11**.
+Requires **Python 3.11** and **Node.js 18+**.
+
+### 1. Analysis (Python)
 
 ```bash
 git clone https://github.com/meronsisay/Oil-Change-Point-Analysis
@@ -119,7 +156,25 @@ pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-Place the raw price file at `data/raw/BrentOilPrices.csv` before running any
-notebooks or scripts. Then run `notebooks/change_point_model.ipynb` end to
-end at least once to populate `data/processed/` before starting the
-backend (`python backend/app.py`).
+Place the raw price file at `data/raw/BrentOilPrices.csv`, then run
+`notebooks/change_point_model.ipynb` end to end at least once — this
+populates `data/processed/`, which the dashboard depends on.
+
+### 2. Backend
+
+```bash
+python backend/app.py
+```
+Runs on `http://localhost:5000`. Check `http://localhost:5000/api/health`
+first — all files should show `true` before starting the frontend.
+
+### 3. Frontend
+
+```bash
+cd frontend
+npm install
+cp .env.example .env
+npm run dev
+```
+Opens on `http://localhost:3000`. See `frontend/README.md` for a full
+feature-testing checklist.
